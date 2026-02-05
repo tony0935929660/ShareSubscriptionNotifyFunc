@@ -56,25 +56,26 @@ public class ShareSubscriptionNotifyJob
     }
 
     [Function("ShareSubscriptionNotify")]
-    public async Task Run([TimerTrigger("0 0 18 * * *")] TimerInfo timer)
+    public async Task Run([TimerTrigger("0 0 1 * * *")] TimerInfo timer)
     {
-        var url = Environment.GetEnvironmentVariable("ExcelUrl"); // 你環境變數名稱沿用也行
+        var taipeiTz = GetTaipeiTimeZone();
+        var taipeiNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, taipeiTz);
+
+        // 台北今年 → {year} 取代
+        int year = taipeiNow.Year;
+        var url = Environment.GetEnvironmentVariable("ExcelUrl");
         if (string.IsNullOrWhiteSpace(url))
         {
             _logger.LogError("ExcelUrl is missing in application settings.");
             return;
         }
-
-        // 台北今年 → {year} 取代
-        var taipeiTz = GetTaipeiTimeZone();
-        int year = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, taipeiTz).Year;
         url = url.Replace("{year}", year.ToString(CultureInfo.InvariantCulture));
 
         _logger.LogInformation("Downloading CSV from: {Url}", url);
 
         await using var stream = await DownloadToStreamAsync(url);
 
-        var rows = ParsePublicFormCsv(stream);
+        var rows = ParsePublicFormCsv(stream, taipeiNow); // 傳遞 taipeiNow
 
         if (rows.Count == 0)
         {
@@ -92,8 +93,8 @@ public class ShareSubscriptionNotifyJob
             _logger.LogInformation("Stock={StockCode} Name={Name} DrawDate={DrawDate} Rate={Rate}",
                 r.StockCode, r.SecurityName, r.DrawDate, r.WinningRate);
 
-            var startDate = DateTime.Today.AddDays(-5);
-            var endDate = DateTime.Today;
+            var startDate = taipeiNow.Date.AddDays(-5);
+            var endDate = taipeiNow.Date;
 
             var response = await _finmindHttp.GetAsync(
                 $"/api/v4/data?dataset=TaiwanStockPrice" +
@@ -141,7 +142,7 @@ public class ShareSubscriptionNotifyJob
     // ---------------------------
     // CSV Parse (Stream -> DTO)
     // ---------------------------
-    private List<PublicFormRow> ParsePublicFormCsv(Stream csvStream)
+    private List<PublicFormRow> ParsePublicFormCsv(Stream csvStream, DateTime taipeiNow)
     {
         // 如果你的 CSV 是 Big5/CP950，改 Encoding.GetEncoding(950)
         using var reader = new StreamReader(csvStream, Encoding.GetEncoding(950), detectEncodingFromByteOrderMarks: true, leaveOpen: true);
@@ -173,7 +174,7 @@ public class ShareSubscriptionNotifyJob
             return new List<PublicFormRow>();
         }
 
-        var today = DateOnly.FromDateTime(DateTime.Now);
+        var today = DateOnly.FromDateTime(taipeiNow);
         var results = new List<PublicFormRow>();
         int rowNumber = 1; // CSV 行號（含 header）；資料行從 2 開始
 
