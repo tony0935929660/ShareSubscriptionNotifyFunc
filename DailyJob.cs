@@ -56,7 +56,7 @@ public class ShareSubscriptionNotifyJob
     }
 
     [Function("ShareSubscriptionNotify")]
-    public async Task Run([TimerTrigger("0 0 */1 * * *")] TimerInfo timer)
+    public async Task Run([TimerTrigger("0 0 1 * * *")] TimerInfo timer)
     {
         var taipeiTz = GetTaipeiTimeZone();
         var taipeiNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, taipeiTz);
@@ -79,7 +79,6 @@ public class ShareSubscriptionNotifyJob
 
         if (rows.Count == 0)
         {
-            await BroadcastTextAsync("今日沒有公開抽籤申購股票喔！");
             _logger.LogInformation("No subscription stocks found today.");
             return;
         }
@@ -94,7 +93,7 @@ public class ShareSubscriptionNotifyJob
             _logger.LogInformation("Stock={StockCode} Name={Name} DrawDate={DrawDate} Rate={Rate}",
                 r.StockCode, r.SecurityName, r.DrawDate, r.WinningRate);
 
-            var startDate = taipeiNow.Date.AddDays(-5);
+            var startDate = taipeiNow.Date.AddDays(-20);
             var endDate = taipeiNow.Date;
 
             var response = await _finmindHttp.GetAsync(
