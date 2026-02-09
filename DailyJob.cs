@@ -83,8 +83,8 @@ public class ShareSubscriptionNotifyJob
             return;
         }
 
-        var msg = $"今日公開抽籤申購中股票";
-        var incomingMsg = $"即將公開抽籤申購股票";
+        List<string> msgLines = new();
+        List<string> incomingMsgLines = new(); 
 
         _logger.LogInformation("Parsed rows (4-digit StockCode only): {Count}", rows.Count);
 
@@ -127,15 +127,24 @@ public class ShareSubscriptionNotifyJob
                 continue;
 
             if (r.IsInSubscribePeriod) {
-                msg += $"\n\n{r.StockCode} {r.SecurityName}\n抽籤日 {r.DrawDate:MM/dd}   價差 +{roi:F0}%\n最新價 {latest.Close}    承銷價 {r.ActualUnderwritePrice}";
+                msgLines.Add($"\n\n{r.StockCode} {r.SecurityName}\n抽籤日 {r.DrawDate:MM/dd}   價差 +{roi:F0}%\n最新價 {latest.Close}    承銷價 {r.ActualUnderwritePrice}");
             } else {
-                incomingMsg += $"\n\n{r.StockCode} {r.SecurityName}\n申購開始日 {r.SubscribeStartDate:MM/dd}\n申購結束日 {r.SubscribeEndDate:MM/dd}\n抽籤日 {r.DrawDate:MM/dd}    價差 +{roi:F0}%\n最新價 {latest.Close}    承銷價 {r.ActualUnderwritePrice}";
+                incomingMsgLines.Add($"\n\n{r.StockCode} {r.SecurityName}\n申購開始日 {r.SubscribeStartDate:MM/dd}\n申購結束日 {r.SubscribeEndDate:MM/dd}\n抽籤日 {r.DrawDate:MM/dd}    價差 +{roi:F0}%\n最新價 {latest.Close}    承銷價 {r.ActualUnderwritePrice}");
             }
         }
 
-        await BroadcastTextAsync(msg);
-        await BroadcastTextAsync(incomingMsg);
+        if (msgLines.Count > 0)
+        {
+            msgLines.Insert(0, $"今日公開抽籤申購中股票，共 {msgLines.Count} 檔：");
+            await BroadcastTextAsync(string.Join("", msgLines));
+        }
         
+        if (incomingMsgLines.Count > 0)
+        {
+            incomingMsgLines.Insert(0, $"即將公開抽籤申購股票，共 {incomingMsgLines.Count} 檔：");
+            await BroadcastTextAsync(string.Join("", incomingMsgLines));
+        }
+
         _logger.LogInformation("Job done.");
     }
 
@@ -386,6 +395,8 @@ public class ShareSubscriptionNotifyJob
                 new { type = "text", text }
             }
         };
+
+        _logger.LogInformation("Broadcasting LINE message: {Text}", text);
 
         var resp = await _lineHttp.PostAsJsonAsync("/v2/bot/message/broadcast", payload);
 
