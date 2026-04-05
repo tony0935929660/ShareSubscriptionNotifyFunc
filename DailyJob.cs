@@ -93,6 +93,12 @@ public class ShareSubscriptionNotifyJob
             _logger.LogInformation("Stock={StockCode} Name={Name} DrawDate={DrawDate} Rate={Rate}",
                 r.StockCode, r.SecurityName, r.DrawDate, r.WinningRate);
 
+            if (r.ActualUnderwritePrice == null || r.ActualUnderwritePrice <= 0)
+            {
+                _logger.LogWarning("Invalid ActualUnderwritePrice for Stock={StockCode}", r.StockCode);
+                continue;
+            }
+
             var startDate = taipeiNow.Date.AddDays(-20);
             var endDate = taipeiNow.Date;
 
@@ -446,14 +452,14 @@ public class ShareSubscriptionNotifyJob
     public class FinMindResponse<T>
     {
         public int Status { get; set; }
-        public string Msg { get; set; }
-        public List<T> Data { get; set; }
+        public required string Msg { get; set; }
+        public required List<T> Data { get; set; }
     }
 
     public class TaiwanStockPriceDto
     {
-        public string Date { get; set; }
-        public string Stock_Id { get; set; }
+        public required string Date { get; set; }
+        public required string Stock_Id { get; set; }
         public decimal Open { get; set; }
         public decimal Max { get; set; }
         public decimal Min { get; set; }
